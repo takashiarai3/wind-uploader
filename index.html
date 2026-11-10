@@ -82,13 +82,17 @@ canvas,video{width:100%;border-radius:8px;background:#000;display:block}
 <div class="card" id="result" hidden>
   <h2>④ 確認してアップロード</h2>
   <video id="out" controls playsinline></video>
-  <p class="mut" style="margin:10px 0 4px">タイトル</p>
-  <input type="text" id="t" readonly>
-  <p class="mut" style="margin:8px 0 4px">説明欄（コメント）</p>
-  <textarea id="d" rows="4" readonly></textarea>
+  <p class="mut" style="margin:10px 0 4px">YouTubeのタイトル（自動で入ります。直せます）</p>
+  <input type="text" id="t">
+  <p class="mut" style="margin:8px 0 4px">説明欄（場所・日付・コメント・風の一覧）</p>
+  <textarea id="d" rows="12"></textarea>
+  <p class="mut" style="margin:8px 0 4px">ハッシュタグ（説明欄の末尾に付きます）</p>
+  <input type="text" id="h">
+  <p class="mut" style="margin:8px 0 4px">場所（API直接アップロードのときYouTubeの「場所」に送ります）</p>
+  <input type="text" id="loc">
   <button id="share">▶ YouTubeアプリに送る（おすすめ）</button>
-  <button id="copy" class="sub">タイトルと説明欄をコピー</button>
-  <select id="priv" class="hide" style="width:100%;padding:10px;margin-top:8px;font:inherit"><option value="private">API: 非公開</option><option value="unlisted">API: 限定公開</option><option value="public">API: 公開</option></select>
+  <button id="copyT" class="sub">タイトルをコピー</button>
+  <button id="copyD" class="sub">説明欄をコピー（ハッシュタグ込み）</button>
   <button id="api" class="hide">⬆ このアプリから直接アップロード（API）</button>
   <a id="save" class="btn sub" style="background:transparent;color:var(--ac);border:1px solid var(--ac)">動画を端末に保存</a>
   <div id="msg" class="mut"></div>
@@ -383,23 +387,34 @@ function ext() { return blob.type.includes("mp4") ? "mp4" : "webm"; }
 function showResult() {
   const url = URL.createObjectURL(blob);
   $("out").src = url; $("out").play();             // 焼き付け後の動画を再生
-  $("t").value = M.title; $("d").value = M.desc;
+  fillYT();
   $("save").href = url; $("save").download = `wind_${M.date.slice(0, 10).replace(/\//g, "")}.${ext()}`;
   $("result").hidden = false; $("result").scrollIntoView();
 }
 
-$("copy").onclick = async () => {
-  await navigator.clipboard.writeText(`${M.title}\n${M.desc}`);
-  $("msg").textContent = "コピーしました（1行目＝タイトル、2行目以降＝説明欄）";
+const SPOT_TAG = { "津久井浜": "#津久井浜", "ベトナムムイネー": "#ムイネー", "本栖": "#本栖湖" };
+const hashtags = sp => `#WingFoil #Shorts${sp ? " " + (SPOT_TAG[sp] || "#" + sp.replace(/\s/g, "")) : ""}`;
+const fullDesc = () => `${$("d").value.trim()}\n\n${$("h").value.trim()}`;
+function fillYT() {                       // YouTube用の既定値: タイトル / 説明欄 / ハッシュタグ / 場所
+  $("t").value = M.title;
+  $("d").value = archiveText();
+  $("h").value = hashtags(M.sp);
+  $("loc").value = M.sp;
+}
+const copyTo = async (text, ok) => {
+  try { await navigator.clipboard.writeText(text); $("msg").textContent = ok; }
+  catch (e) { $("msg").textContent = "自動コピーできませんでした。欄を長押ししてコピーしてください。"; }
 };
+$("copyT").onclick = () => copyTo($("t").value, "タイトルをコピーしました。");
+$("copyD").onclick = () => copyTo(fullDesc(), "説明欄をコピーしました（ハッシュタグ込み）。");
 
 // ① YouTubeアプリへ共有（審査不要・公開も可能）
 $("share").onclick = async () => {
   const f = new File([blob], `wind.${ext()}`, { type: blob.type.split(";")[0] });
   if (!navigator.canShare || !navigator.canShare({ files: [f] })) return alert("この端末では共有できません。「動画を端末に保存」からYouTubeアプリで追加してください。");
-  try { await navigator.clipboard.writeText(M.title); } catch (e) {}
-  $("msg").textContent = "タイトルをコピー済み。YouTubeの画面で貼り付け、説明欄は「タイトルと説明欄をコピー」を使ってください。";
-  try { await navigator.share({ files: [f], title: M.title, text: M.desc }); } catch (e) {}
+  try { await navigator.clipboard.writeText($("t").value); } catch (e) {}
+  $("msg").textContent = "タイトルをコピー済みです。YouTubeの画面で貼り付け、説明欄は「説明欄をコピー」を使ってください。";
+  try { await navigator.share({ files: [f], title: $("t").value, text: fullDesc() }); } catch (e) {}
 };
 
 // ② APIで直接アップロード（Google未審査のプロジェクトだと「非公開固定」になります）
@@ -413,9 +428,11 @@ $("api").onclick = () => {
 };
 async function upload() {
   const type = blob.type.split(";")[0];
-  const meta = { snippet: { title: M.title, description: M.desc, tags: M.tags, categoryId: "17" },
+  const T = $("t").value.trim();
+  const meta = { snippet: { title: T, description: fullDesc(), tags: [T, "WingFoil"], categoryId: "17" },
+                 recordingDetails: { locationDescription: $("loc").value.trim() },
                  status: { privacyStatus: $("priv").value, selfDeclaredMadeForKids: false } };
-  const init = await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", {
+  const init = await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status,recordingDetails", {
     method: "POST",
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json; charset=UTF-8",
                "X-Upload-Content-Length": blob.size, "X-Upload-Content-Type": type },
