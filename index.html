@@ -20,6 +20,13 @@ input[type=text],input[type=date],textarea{width:100%;padding:10px;font:inherit;
 button,.btn{display:block;width:100%;padding:14px;margin-top:8px;font:inherit;font-weight:600;border:0;border-radius:10px;background:var(--ac);color:#fff;text-align:center;text-decoration:none}
 button.sub{background:transparent;color:var(--ac);border:1px solid var(--ac)}
 button:disabled{opacity:.5}
+.wr{display:flex;align-items:center;gap:3px;margin-bottom:4px}
+.wr>span{width:34px;flex:none;font-weight:500;font-size:14px}
+.wc{flex:1;min-width:0}
+.wc input{display:none}
+.wc span{display:block;padding:9px 0;text-align:center;font-size:13px;border:1px solid var(--bd);border-radius:8px;white-space:nowrap}
+.wc input:checked+span{background:var(--c);color:var(--tc);border-color:#888780;font-weight:600}
+#chart{margin:10px 0 4px}
 canvas,video{width:100%;border-radius:8px;background:#000;display:block}
 .hide{display:none}
 .mut{color:var(--mut);font-size:.85rem}
@@ -46,10 +53,22 @@ canvas,video{width:100%;border-radius:8px;background:#000;display:block}
   <input type="text" id="other" class="hide" placeholder="場所を入力">
   <p class="mut" style="margin:8px 0 4px">日付（動画の撮影日が自動で入ります）</p>
   <input type="date" id="date">
-  <p class="mut" style="margin:8px 0 4px">コメント</p>
-  <input type="text" id="comment" placeholder="例: 午前は4.5ジャスト 午後は少し落ちた">
+  <p class="mut" style="margin:10px 0 4px">焼き付ける文字（自由に編集できます。【場所】日付を消すと、焼き付けにも入りません）</p>
+  <textarea id="comment" rows="5"></textarea>
+  <p class="mut" style="margin:8px 0 4px">映像の時刻（コメントの下に1行あけて入ります。消すと入りません）</p>
+  <input type="text" id="tline">
   <button id="ok" disabled>OK（文字を焼き付ける）</button>
   <p class="mut">※処理は動画の長さと同じ時間かかります。画面を消さず、このタブを開いたままにしてください。</p>
+</div>
+
+<div class="card">
+  <h2>③ 時間別の風（ウイングサイズ）</h2>
+  <p class="mut" style="margin:0 0 8px">時間ごとにタップで選びます。選ばない時間は点が出ません（—）。</p>
+  <div id="winds"></div>
+  <div id="chart"></div>
+  <button id="copyall" class="sub">📋 日付・コメント・風の一覧をまとめてコピー</button>
+  <textarea id="archive" rows="10" readonly class="hide" style="margin-top:8px"></textarea>
+  <div id="cmsg" class="mut"></div>
 </div>
 
 <div class="card" id="work" hidden>
@@ -58,7 +77,7 @@ canvas,video{width:100%;border-radius:8px;background:#000;display:block}
 </div>
 
 <div class="card" id="result" hidden>
-  <h2>③ 確認してアップロード</h2>
+  <h2>④ 確認してアップロード</h2>
   <video id="out" controls playsinline></video>
   <p class="mut" style="margin:10px 0 4px">タイトル</p>
   <input type="text" id="t" readonly>
@@ -87,37 +106,177 @@ let file, blob, M;
 if (CLIENT_ID) { $("api").classList.remove("hide"); $("priv").classList.remove("hide"); }
 
 $("pick").onclick = () => $("file").click();
+let lastHeader = "";
+const spotName = () => {
+  const v = document.querySelector("input[name=spot]:checked").value;
+  return v === "その他" ? $("other").value.trim() : v;
+};
+const dateStr = () => {
+  const [y, m, d] = $("date").value.split("-").map(Number);
+  return `${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}(${WD[new Date(y, m - 1, d).getDay()]})`;
+};
+// 【場所】日付(曜) を既定で入れる。ユーザーが消していたら、場所や日付を変えても入れ直さない
+function refreshHeader(reset) {
+  if (!$("date").value) return;
+  const h = `【${spotName() || "　"}】${dateStr()}`;
+  const c = $("comment");
+  if (reset) c.value = h + " ";
+  else if (lastHeader && c.value.startsWith(lastHeader)) c.value = h + c.value.slice(lastHeader.length);
+  lastHeader = h;
+}
 $("file").onchange = e => {
   file = e.target.files[0];
   if (!file) return;
   $("fname").textContent = file.name;
-  $("date").value = new Date(file.lastModified).toLocaleDateString("sv-SE");
+  const ok = file.lastModified > 946684800000;           // タイムスタンプが取れた場合のみ時刻を入れる
+  const t = new Date(ok ? file.lastModified : Date.now());
+  $("date").value = t.toLocaleDateString("sv-SE");
+  $("tline").value = ok ? `映像は${t.getHours()}時${t.getMinutes()}分の様子` : "";
+  refreshHeader(true);
   $("ok").disabled = false;
 };
 document.querySelectorAll("input[name=spot]").forEach(r => r.onchange = () => {
-  $("other").classList.toggle("hide", r.value !== "その他" || !r.checked);
+  $("other").classList.toggle("hide", document.querySelector("input[name=spot]:checked").value !== "その他");
+  refreshHeader();
 });
+$("other").oninput = $("date").oninput = () => refreshHeader();
 
 function getMeta() {
-  let sp = document.querySelector("input[name=spot]:checked").value;
-  if (sp === "その他") sp = $("other").value.trim();
-  const [y, m, d] = $("date").value.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  const date = `${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}(${WD[dt.getDay()]})`;
-  const comment = $("comment").value.normalize("NFKC").trim();
-  const title = `【${sp}】${date}`;               // タイトル：場所と日付
-  const text = `${title} ${comment}`;              // 動画に焼く文字＝コメント
+  const sp = spotName(), date = dateStr();
+  const c = $("comment").value.trim(), tl = $("tline").value.trim();
+  const text = tl ? (c ? `${c}\n\n${tl}` : tl) : c;     // コメントの2行下（空行1つ）に時刻
+  const title = `【${sp}】${date}`;                         // タイトルは場所と日付のみ
   return { sp, date, title, text, desc: `${text}\n\n#WingFoil #Shorts`, tags: [title, "WingFoil"] };
 }
 
 function wrap(ctx, text, maxW) {
-  const lines = []; let l = "";
-  for (const ch of text) {
-    if (l && ctx.measureText(l + ch).width > maxW) { lines.push(l); l = ""; }
-    l += ch;
+  const out = [];
+  for (const para of text.split("\n")) {
+    let l = "";
+    for (const ch of para) {
+      if (l && ctx.measureText(l + ch).width > maxW) { out.push(l); l = ""; }
+      l += ch;
+    }
+    out.push(l);
   }
-  if (l) lines.push(l);
-  return lines;
+  while (out.length && !out[out.length - 1]) out.pop();
+  return out;
+}
+
+const HRS = [9, 10, 11, 12, 13, 14, 15, 16, 17];
+const LV = {
+  w: { l: "無風", v: 0.6, c: "#FFFFFF", r: "ほぼ0m/s" },
+  b: { l: "微風", v: 2.5, c: "#378ADD", r: "〜4m/s" },
+  "6": { l: "6㎡", v: 5, c: "#2E9E4F", r: "4〜6m/s" },
+  "5": { l: "5㎡", v: 7, c: "#F2C200", r: "6〜8m/s" },
+  "4": { l: "4㎡", v: 9.5, c: "#F28C1E", r: "8〜11m/s" },
+  "3": { l: "3㎡", v: 12.5, c: "#E24B4A", r: "11〜14m/s" },
+  "2": { l: "2㎡", v: 16, c: "#1A1A1A", r: "14m/s〜" }
+};
+const OPTS = [["w", "#14202b"], ["b", "#fff"], ["6", "#fff"], ["5", "#14202b"], ["4", "#14202b"], ["3", "#fff"], ["2", "#fff"]];
+const wind = {};
+const GX = h => 48 + (h - 9) * 35.75, GY = v => 266 - 250 * v / 18;
+
+$("winds").innerHTML = HRS.map(h => `<div class="wr"><span>${h}時</span>` +
+  OPTS.map(([k, tc]) => `<label class="wc" style="--c:${LV[k].c};--tc:${tc}"><input type="radio" name="w${h}" value="${k}"><span>${LV[k].l}</span></label>`).join("") +
+  `<label class="wc" style="--c:var(--bd);--tc:var(--fg)"><input type="radio" name="w${h}" value="" checked><span>—</span></label></div>`).join("");
+$("winds").onchange = e => {
+  const m = e.target.name.match(/^w(\d+)$/);
+  if (m) { wind[m[1]] = e.target.value; renderChart(); }
+};
+
+function renderChart() {
+  const f = n => n.toFixed(1);
+  const tx = (x, y, s, a, sz, st, w) => `<text x="${f(x)}" y="${f(y)}" text-anchor="${a}" font-size="${sz}"${w ? ' font-weight="500"' : ""} style="fill:var(--${st})">${s}</text>`;
+  let o = `<svg viewBox="0 0 396 322" width="100%" role="img" aria-label="時間別の風とウイングサイズのグラフ">`;
+  [4, 6, 8, 11, 14].forEach(v => o += `<line x1="48" y1="${f(GY(v))}" x2="334" y2="${f(GY(v))}" stroke-dasharray="3 3" style="stroke:var(--bd)"/>`);
+  o += `<path d="M48 16V266H334" fill="none" style="stroke:var(--mut)"/>`;
+  [0, 4, 6, 8, 11, 14, 18].forEach(v => o += tx(40, GY(v) + 4, v, "end", 11, "mut"));
+  o += tx(48, 10, "風速 m/s", "start", 11, "mut");
+  HRS.forEach(h => o += tx(GX(h), 284, h, "middle", 11, "mut"));
+  o += tx(191, 302, "時", "middle", 11, "mut");
+  let run = [];
+  const flush = () => {
+    if (run.length > 1) o += `<polyline points="${run.join(" ")}" fill="none" stroke-width="1.5" stroke-linejoin="round" style="stroke:var(--mut)"/>`;
+    run = [];
+  };
+  HRS.forEach(h => { const k = wind[h]; if (k) run.push(`${f(GX(h))},${f(GY(LV[k].v))}`); else flush(); });
+  flush();
+  HRS.forEach(h => {
+    const k = wind[h]; if (!k) return;
+    const L = LV[k], x = GX(h), y = GY(L.v);
+    o += `<circle cx="${f(x)}" cy="${f(y)}" r="9" fill="${L.c}" stroke="#888780"/>` + tx(x, y - 14, L.l, "middle", 12, "fg", 1);
+  });
+  ["2", "3", "4", "5", "6", "b", "w"].forEach(k => {
+    const L = LV[k], y = GY(L.v);
+    o += `<circle cx="357" cy="${f(y)}" r="5" fill="${L.c}" stroke="#888780"/>` + tx(366, y + 4, L.l, "start", 11, "mut");
+  });
+  $("chart").innerHTML = o + "</svg>";
+}
+renderChart();
+
+// 保管用：日付・場所・コメント・時間別の風を、1つの文章にしてコピー
+function archiveText() {
+  const m = getMeta();
+  const rows = HRS.map(h => wind[h] ? `${h}時 ${LV[wind[h]].l}（${LV[wind[h]].r}）` : `${h}時 -`);
+  return `日付: ${m.date}\n場所: ${m.sp || "（未入力）"}\n\n[コメント]\n${m.text || "（なし）"}\n\n[風とウイング（時間別）]\n${rows.join("\n")}`;
+}
+$("copyall").onclick = async () => {
+  if (!$("date").value) return alert("先に動画を選ぶか、日付を入れてください");
+  const t = archiveText();
+  $("archive").value = t; $("archive").classList.remove("hide");
+  try {
+    await navigator.clipboard.writeText(t);
+    $("cmsg").textContent = "コピーしました。メモ帳やGitHubなどに貼り付けて保管してください。";
+  } catch (e) {
+    $("archive").select();
+    $("cmsg").textContent = "自動コピーできませんでした。上の文字を長押ししてコピーしてください。";
+  }
+};
+
+// 動画に焼き付けるグラフ（薄いグレーの半透明パネル）。論理サイズ1000x500で描いて拡大縮小する
+function graphCanvas(gw) {
+  if (!HRS.some(h => wind[h])) return null;
+  const k = gw / 1000, c = document.createElement("canvas");
+  c.width = Math.round(gw); c.height = Math.round(500 * k);
+  const g = c.getContext("2d");
+  g.scale(k, k);
+  const L = 70, R = 860, T = 56, B = 420;
+  const X = h => 100 + (h - 9) * 91.25, Y = v => B - (B - T) * v / 18;
+  const font = (px, w) => `${w || 400} ${px}px ${FONT}`;
+  g.fillStyle = "rgba(236,239,241,.78)";
+  g.beginPath(); g.roundRect ? g.roundRect(0, 0, 1000, 500, 24) : g.rect(0, 0, 1000, 500); g.fill();
+  g.strokeStyle = "rgba(0,0,0,.2)"; g.lineWidth = 2; g.setLineDash([8, 8]);
+  [4, 6, 8, 11, 14].forEach(v => { g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(R, Y(v)); g.stroke(); });
+  g.setLineDash([]); g.strokeStyle = "#555"; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(L, T - 10); g.lineTo(L, B); g.lineTo(R, B); g.stroke();
+  g.fillStyle = "#333"; g.font = font(24); g.textBaseline = "alphabetic";
+  g.textAlign = "right"; [0, 4, 6, 8, 11, 14, 18].forEach(v => g.fillText(v, L - 10, Y(v) + 8));
+  g.textAlign = "left"; g.fillText("風速 m/s", L, 34);
+  g.textAlign = "center"; g.font = font(26);
+  HRS.forEach(h => g.fillText(h, X(h), B + 38)); g.fillText("時", R + 6, B + 38);
+  g.strokeStyle = "#666"; g.lineWidth = 3; g.lineJoin = "round";
+  let on = false;
+  HRS.forEach(h => {
+    const kk = wind[h];
+    if (!kk) { on = false; return; }
+    if (on) g.lineTo(X(h), Y(LV[kk].v)); else { g.beginPath(); g.moveTo(X(h), Y(LV[kk].v)); on = true; }
+    const nx = wind[h + 1]; if (!nx) g.stroke();
+  });
+  HRS.forEach(h => {
+    const kk = wind[h]; if (!kk) return;
+    const l = LV[kk];
+    g.beginPath(); g.arc(X(h), Y(l.v), 22, 0, 7); g.fillStyle = l.c; g.fill();
+    g.strokeStyle = "#666"; g.lineWidth = 2; g.stroke();
+    g.fillStyle = "#111"; g.font = font(30, 700); g.textAlign = "center"; g.fillText(l.l, X(h), Y(l.v) - 30);
+  });
+  ["2", "3", "4", "5", "6", "b", "w"].forEach(kk => {
+    const l = LV[kk];
+    g.beginPath(); g.arc(905, Y(l.v), 12, 0, 7); g.fillStyle = l.c; g.fill();
+    g.strokeStyle = "#666"; g.lineWidth = 2; g.stroke();
+    g.fillStyle = "#333"; g.font = font(26); g.textAlign = "left"; g.fillText(l.l, 926, Y(l.v) + 9);
+  });
+  return c;
 }
 
 $("ok").onclick = async () => {
@@ -143,14 +302,19 @@ async function burn() {
   const fs = Math.round(W * 0.045), pad = 12, side = 20, lh = fs * 1.25;
   ctx.font = `${fs}px ${FONT}`;
   const lines = wrap(ctx, M.text, W - 2 * (pad + side));
-  const bw = Math.max(...lines.map(s => ctx.measureText(s).width));
+  const bw = lines.length ? Math.max(...lines.map(s => ctx.measureText(s).width)) : 0;
   const bx = (W - bw) / 2, by = H * 0.08;
+  const gw = Math.min(W * 0.94, H * 0.84);              // グラフの幅（縦長なら画面幅の94%）
+  const gc = graphCanvas(gw);                            // 風の入力が1つもなければ null（グラフなし）
+  const gx = (W - gw) / 2, gy = Math.max(0, H * 0.80 - (gc ? gc.height : 0));   // 下から約2割の位置（YouTubeの表示を避ける）
   const drawFrame = () => {
     ctx.drawImage(v, 0, 0, W, H);
-    ctx.fillStyle = "rgba(0,0,0,.7)";
-    ctx.fillRect(bx - pad, by - pad, bw + 2 * pad, lines.length * lh + 2 * pad - (lh - fs));
-    ctx.fillStyle = "#fff"; ctx.textBaseline = "top"; ctx.font = `${fs}px ${FONT}`;
+    ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.font = `${fs}px ${FONT}`;
+    ctx.fillStyle = "rgba(236,239,241,.72)";             // 薄いグレーの半透明（文字は濃いグレー）
+    if (lines.length) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx - pad, by - pad, bw + 2 * pad, lines.length * lh + 2 * pad - (lh - fs), 12) : ctx.rect(bx - pad, by - pad, bw + 2 * pad, lines.length * lh + 2 * pad - (lh - fs)); ctx.fill(); }
+    ctx.fillStyle = "#111";
     lines.forEach((s, i) => ctx.fillText(s, bx, by + i * lh));
+    if (gc) ctx.drawImage(gc, gx, gy);
   };
 
   const stream = c.captureStream(30);
