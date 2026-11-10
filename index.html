@@ -57,7 +57,7 @@ canvas,video{width:100%;border-radius:8px;background:#000;display:block}
   <textarea id="comment" rows="5"></textarea>
   <p class="mut" style="margin:8px 0 4px">映像の時刻（コメントの下に1行あけて入ります。消すと入りません）</p>
   <input type="text" id="tline">
-  <button id="ok" disabled>OK（文字を焼き付ける）</button>
+  <button id="ok" disabled>文字とグラフを焼き付ける</button>
   <p class="mut">※処理は動画の長さと同じ時間かかります。画面を消さず、このタブを開いたままにしてください。</p>
 </div>
 
@@ -306,7 +306,8 @@ async function burn() {
   const bx = (W - bw) / 2, by = H * 0.08;
   const gw = Math.min(W * 0.94, H * 0.84);              // グラフの幅（縦長なら画面幅の94%）
   const gc = graphCanvas(gw);                            // 風の入力が1つもなければ null（グラフなし）
-  const gx = (W - gw) / 2, gy = Math.max(0, H * 0.80 - (gc ? gc.height : 0));   // 下から約2割の位置（YouTubeの表示を避ける）
+  const boxBottom = lines.length ? by + lines.length * lh + pad - (lh - fs) : by;   // 文字ボックスの下端
+  const gx = (W - gw) / 2, gy = Math.min(boxBottom + 16, H - (gc ? gc.height : 0));   // 文字の直下に配置
   const drawFrame = () => {
     ctx.drawImage(v, 0, 0, W, H);
     ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.font = `${fs}px ${FONT}`;
