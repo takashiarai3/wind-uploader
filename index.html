@@ -57,8 +57,6 @@ canvas,video{width:100%;border-radius:8px;background:#000;display:block}
   <textarea id="comment" rows="5"></textarea>
   <p class="mut" style="margin:8px 0 4px">映像の時刻（コメントの下に1行あけて入ります。消すと入りません）</p>
   <input type="text" id="tline">
-  <button id="ok" disabled>文字とグラフを焼き付ける</button>
-  <p class="mut">※処理は動画の長さと同じ時間かかります。画面を消さず、このタブを開いたままにしてください。</p>
 </div>
 
 <div class="card">
@@ -69,6 +67,11 @@ canvas,video{width:100%;border-radius:8px;background:#000;display:block}
   <button id="copyall" class="sub">📋 日付・コメント・風の一覧をまとめてコピー</button>
   <textarea id="archive" rows="10" readonly class="hide" style="margin-top:8px"></textarea>
   <div id="cmsg" class="mut"></div>
+</div>
+
+<div class="card">
+  <button id="ok" disabled style="margin-top:0">文字とグラフを焼き付ける</button>
+  <p class="mut" style="margin:8px 0 0">※処理は動画の長さと同じ時間かかります。画面を消さず、このタブを開いたままにしてください。</p>
 </div>
 
 <div class="card" id="work" hidden>
@@ -124,14 +127,40 @@ function refreshHeader(reset) {
   else if (lastHeader && c.value.startsWith(lastHeader)) c.value = h + c.value.slice(lastHeader.length);
   lastHeader = h;
 }
-$("file").onchange = e => {
+// 撮影日時: ①動画の中に記録された作成日時(MP4/MOV) → ②ファイルの日時 の順に使う
+async function shotTime(f) {
+  try {
+    let off = 0;
+    while (off < f.size) {
+      const hd = new DataView(await f.slice(off, off + 16).arrayBuffer());
+      let size = hd.getUint32(0), hl = 8;
+      const type = String.fromCharCode(hd.getUint8(4), hd.getUint8(5), hd.getUint8(6), hd.getUint8(7));
+      if (size === 1) { size = Number(hd.getBigUint64(8)); hl = 16; } else if (size === 0) size = f.size - off;
+      if (type === "moov") {
+        const b = new DataView(await f.slice(off + hl, off + hl + 32).arrayBuffer());
+        const secs = b.getUint8(8) === 1 ? Number(b.getBigUint64(12)) : b.getUint32(12);
+        const t = new Date((secs - 2082844800) * 1000);
+        if (secs && t.getFullYear() >= 2000 && t.getTime() < Date.now() + 864e5) return { t, src: "動画の撮影情報" };
+        break;
+      }
+      if (size < 8) break;
+      off += size;
+    }
+  } catch (e) {}
+  if (f.lastModified > 946684800000) return { t: new Date(f.lastModified), src: "ファイルの日時" };
+  return null;
+}
+$("file").onchange = async e => {
   file = e.target.files[0];
   if (!file) return;
-  $("fname").textContent = file.name;
-  const ok = file.lastModified > 946684800000;           // タイムスタンプが取れた場合のみ時刻を入れる
-  const t = new Date(ok ? file.lastModified : Date.now());
+  $("ok").disabled = true;
+  const r = await shotTime(file);
+  const t = r ? r.t : new Date();
+  $("fname").textContent = file.name + (r
+    ? `（撮影 ${t.getMonth() + 1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2, "0")} ← ${r.src}）`
+    : "（撮影日時を取得できませんでした。日付と時刻を確認してください）");
   $("date").value = t.toLocaleDateString("sv-SE");
-  $("tline").value = ok ? `映像は${t.getHours()}時${t.getMinutes()}分の様子` : "";
+  $("tline").value = r ? `映像は${t.getHours()}時${t.getMinutes()}分の様子` : "";
   refreshHeader(true);
   $("ok").disabled = false;
 };
