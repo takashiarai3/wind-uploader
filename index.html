@@ -2,13 +2,13 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>風情報アップローダー</title>
 <style>
 :root{--bg:#f4f6f8;--fg:#14202b;--card:#fff;--ac:#0a7ea4;--bd:#cfd8dc;--mut:#5b6b77}
 @media(prefers-color-scheme:dark){:root{--bg:#10161c;--fg:#e8eef2;--card:#1a232b;--ac:#4cc3e8;--bd:#33424d;--mut:#9fb0bb}}
 *{box-sizing:border-box}
-body{margin:0;padding:12px;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,"Noto Sans CJK JP",sans-serif;max-width:560px;margin-inline:auto}
+body{margin:0;padding:12px;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));padding-bottom:max(12px,env(safe-area-inset-bottom));background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Hiragino Sans","Noto Sans CJK JP",sans-serif;max-width:560px;margin-inline:auto;-webkit-text-size-adjust:100%}
 h1{font-size:1.2rem;margin:4px 0 12px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:12px}
 .card h2{font-size:.95rem;margin:0 0 8px;color:var(--mut)}
@@ -17,7 +17,7 @@ label.chip input{display:none}
 label.chip span{display:inline-block;padding:8px 14px;border:1px solid var(--bd);border-radius:20px}
 label.chip input:checked+span{background:var(--ac);color:#fff;border-color:var(--ac)}
 input[type=text],input[type=date],textarea{width:100%;padding:10px;font:inherit;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--fg)}
-button,.btn{display:block;width:100%;padding:14px;margin-top:8px;font:inherit;font-weight:600;border:0;border-radius:10px;background:var(--ac);color:#fff;text-align:center;text-decoration:none}
+button,.btn{-webkit-appearance:none;appearance:none;display:block;width:100%;padding:14px;margin-top:8px;font:inherit;font-weight:600;border:0;border-radius:10px;background:var(--ac);color:#fff;text-align:center;text-decoration:none}
 button.sub{background:transparent;color:var(--ac);border:1px solid var(--ac)}
 button:disabled{opacity:.5}
 .wr{display:flex;align-items:center;gap:3px;margin-bottom:4px}
@@ -26,9 +26,16 @@ button:disabled{opacity:.5}
 .wc input{display:none}
 .wc span{display:block;padding:9px 0;text-align:center;font-size:13px;border:1px solid var(--bd);border-radius:8px;white-space:nowrap}
 .wc input:checked+span{background:var(--c);color:var(--tc);border-color:#888780;font-weight:600}
+.dr{margin-bottom:0}
+.dr .wc span{padding:7px 0;font-size:12px}
+.dl{font-size:11px!important;color:var(--mut)}
+.dc input:checked+span{background:var(--ac);color:#fff;border-color:var(--ac)}
+.hg{padding-bottom:8px;margin-bottom:8px;border-bottom:1px dashed var(--bd)}
+.hg:last-child{border-bottom:0;margin-bottom:0}
 #chart{margin:10px 0 4px}
 canvas,video{width:100%;border-radius:8px;background:#000;display:block}
 .hide{display:none}
+.vhid{position:fixed;right:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none}
 .mut{color:var(--mut);font-size:.85rem}
 </style>
 </head>
@@ -60,8 +67,8 @@ canvas,video{width:100%;border-radius:8px;background:#000;display:block}
 </div>
 
 <div class="card">
-  <h2>③ 時間別の風（ウイングサイズ）</h2>
-  <p class="mut" style="margin:0 0 8px">時間ごとにタップで選びます。選ばない時間は点が出ません（—）。</p>
+  <h2>③ 時間別の風（ウイングサイズと風向き）</h2>
+  <p class="mut" style="margin:0 0 8px">時間ごとに、上の段で風の強さ、下の段で風向きをタップして選びます。選ばない時間は出ません（—）。グラフには、風の強さを矢印の色、風向きを矢印の向きで焼き付けます。風向きは「風が吹いてくる方向」です（北西＝北西から吹く）。矢印は風が吹いていく向きで、上が北です。風向きを選ばない時間は、矢印の代わりに丸になります。</p>
   <div id="winds"></div>
   <div id="chart"></div>
   <button id="copyall" class="sub">📋 日付・コメント・風の一覧をまとめてコピー</button>
@@ -95,10 +102,11 @@ canvas,video{width:100%;border-radius:8px;background:#000;display:block}
   <button id="copyD" class="sub">説明欄をコピー（ハッシュタグ込み）</button>
   <button id="api" class="hide">⬆ このアプリから直接アップロード（API）</button>
   <a id="save" class="btn sub" style="background:transparent;color:var(--ac);border:1px solid var(--ac)">動画を端末に保存</a>
+  <p class="mut" style="margin:8px 0 0">iPhone: 「YouTubeアプリに送る」で共有先にYouTubeが出ないときは、共有画面の「ビデオを保存」で写真アプリに保存してから、YouTubeアプリで追加してください。</p>
   <div id="msg" class="mut"></div>
 </div>
 
-<video id="src" playsinline class="hide"></video>
+<video id="src" playsinline webkit-playsinline preload="auto" class="vhid"></video>
 
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script>
@@ -106,9 +114,10 @@ canvas,video{width:100%;border-radius:8px;background:#000;display:block}
 const CLIENT_ID = "";
 
 const WD = "日月火水木金土";
-const FONT = '"Noto Sans CJK JP","Noto Sans JP",Meiryo,sans-serif';
+const FONT = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans CJK JP","Noto Sans JP",Meiryo,sans-serif';
 const $ = id => document.getElementById(id);
-let file, blob, M;
+let file, blob, M, srcUrl;
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;   // どの端末でも同じ形式になるよう自前で作る
 
 if (CLIENT_ID) { $("api").classList.remove("hide"); $("priv").classList.remove("hide"); }
 
@@ -154,6 +163,13 @@ async function shotTime(f) {
   if (f.lastModified > 946684800000) return { t: new Date(f.lastModified), src: "ファイルの日時" };
   return null;
 }
+// 動画の情報（長さ・サイズ）が読めるまで待つ。timeout(ms)を過ぎたら失敗として返す
+const metaReady = (v, timeout) => new Promise((res, rej) => {
+  if (v.readyState >= 1) return res();
+  const t = setTimeout(() => rej(new Error("動画を読み込めません")), timeout);
+  v.onloadedmetadata = () => { clearTimeout(t); v.onloadedmetadata = v.onerror = null; res(); };
+  v.onerror = () => { clearTimeout(t); v.onloadedmetadata = v.onerror = null; rej(new Error("動画を読み込めません（再生できない形式かもしれません）")); };
+});
 $("file").onchange = async e => {
   file = e.target.files[0];
   if (!file) return;
@@ -163,9 +179,14 @@ $("file").onchange = async e => {
   $("fname").textContent = file.name + (r
     ? `（撮影 ${t.getMonth() + 1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2, "0")} ← ${r.src}）`
     : "（撮影日時を取得できませんでした。日付と時刻を確認してください）");
-  $("date").value = t.toLocaleDateString("sv-SE");
+  $("date").value = ymd(t);
   $("tline").value = r ? `映像は${t.getHours()}時${t.getMinutes()}分の様子` : "";
   refreshHeader(true);
+  // 動画はここで先に読み込んでおく（iPhoneは、ボタンを押した直後に再生を始めないと止められることがあるため）
+  const v = $("src");
+  if (srcUrl) URL.revokeObjectURL(srcUrl);
+  srcUrl = URL.createObjectURL(file); v.src = srcUrl; v.load();
+  try { await metaReady(v, 5000); } catch (err) {}
   $("ok").disabled = false;
 };
 document.querySelectorAll("input[name=spot]").forEach(r => r.onchange = () => {
@@ -207,25 +228,40 @@ const LV = {
   "2": { l: "2㎡", v: 16, c: "#1A1A1A", r: "14m/s〜" }
 };
 const OPTS = [["w", "#14202b"], ["b", "#fff"], ["6", "#fff"], ["5", "#14202b"], ["4", "#14202b"], ["3", "#fff"], ["2", "#fff"]];
-const wind = {};
+const wind = {}, dir = {};
+// 風向き: キー → [表示, 風が吹いてくる方位(度。北=0、東=90)]。入力画面の並び順どおり
+const DIRS = [["NW", "北西", 315], ["N", "北", 0], ["NE", "北東", 45], ["E", "東", 90],
+              ["SE", "南東", 135], ["S", "南", 180], ["SW", "南西", 225], ["W", "西", 270]];
+const DIR = Object.fromEntries(DIRS.map(([k, l, a]) => [k, { l, a }]));
+// true: 矢印は「風が吹いていく向き」（北西の風 → 矢印は南東向き）。false: 「風が吹いてくる向き」に反転
+const ARROW_DOWNWIND = true;
+const ARROW_NOTE = ARROW_DOWNWIND ? "矢印＝風の吹く向き（上が北）" : "矢印＝風の来る向き（上が北）";
+const arrowDeg = k => (DIR[k].a + (ARROW_DOWNWIND ? 180 : 0)) % 360;
+// 太めの矢印の形（中心が原点・上向き・長さ54・軸の太さ16・先の幅38）
+const ARROW = [[0, -27], [19, 0], [8, 0], [8, 27], [-8, 27], [-8, 0], [-19, 0]];
 const GX = h => 48 + (h - 9) * 35.75, GY = v => 266 - 250 * v / 18;
 
-$("winds").innerHTML = HRS.map(h => `<div class="wr"><span>${h}時</span>` +
+$("winds").innerHTML = HRS.map(h => `<div class="hg"><div class="wr"><span>${h}時</span>` +
   OPTS.map(([k, tc]) => `<label class="wc" style="--c:${LV[k].c};--tc:${tc}"><input type="radio" name="w${h}" value="${k}"><span>${LV[k].l}</span></label>`).join("") +
-  `<label class="wc" style="--c:var(--bd);--tc:var(--fg)"><input type="radio" name="w${h}" value="" checked><span>—</span></label></div>`).join("");
+  `<label class="wc" style="--c:var(--bd);--tc:var(--fg)"><input type="radio" name="w${h}" value="" checked><span>—</span></label></div>` +
+  `<div class="wr dr"><span class="dl">風向</span>` +
+  DIRS.map(([k, l]) => `<label class="wc dc"><input type="radio" name="d${h}" value="${k}"><span>${l}</span></label>`).join("") +
+  `<label class="wc" style="--c:var(--bd);--tc:var(--fg)"><input type="radio" name="d${h}" value="" checked><span>—</span></label></div></div>`).join("");
 $("winds").onchange = e => {
-  const m = e.target.name.match(/^w(\d+)$/);
-  if (m) { wind[m[1]] = e.target.value; renderChart(); }
+  const m = e.target.name.match(/^([wd])(\d+)$/);
+  if (m) { (m[1] === "w" ? wind : dir)[m[2]] = e.target.value; renderChart(); }
 };
 
 function renderChart() {
   const f = n => n.toFixed(1);
+  const pts = sc => ARROW.map(([px, py]) => `${f(px * sc)},${f(py * sc)}`).join(" ");
   const tx = (x, y, s, a, sz, st, w) => `<text x="${f(x)}" y="${f(y)}" text-anchor="${a}" font-size="${sz}"${w ? ' font-weight="500"' : ""} style="fill:var(--${st})">${s}</text>`;
-  let o = `<svg viewBox="0 0 396 322" width="100%" role="img" aria-label="時間別の風とウイングサイズのグラフ">`;
+  let o = `<svg viewBox="0 0 396 322" width="100%" role="img" aria-label="時間別の風の強さと風向きのグラフ">`;
   [4, 6, 8, 11, 14].forEach(v => o += `<line x1="48" y1="${f(GY(v))}" x2="334" y2="${f(GY(v))}" stroke-dasharray="3 3" style="stroke:var(--bd)"/>`);
   o += `<path d="M48 16V266H334" fill="none" style="stroke:var(--mut)"/>`;
   [0, 4, 6, 8, 11, 14, 18].forEach(v => o += tx(40, GY(v) + 4, v, "end", 11, "mut"));
   o += tx(48, 10, "風速 m/s", "start", 11, "mut");
+  o += tx(394, 10, ARROW_NOTE, "end", 10, "mut");
   HRS.forEach(h => o += tx(GX(h), 284, h, "middle", 11, "mut"));
   o += tx(191, 302, "時", "middle", 11, "mut");
   let run = [];
@@ -237,12 +273,16 @@ function renderChart() {
   flush();
   HRS.forEach(h => {
     const k = wind[h]; if (!k) return;
-    const L = LV[k], x = GX(h), y = GY(L.v);
-    o += `<circle cx="${f(x)}" cy="${f(y)}" r="9" fill="${L.c}" stroke="#888780"/>` + tx(x, y - 14, L.l, "middle", 12, "fg", 1);
+    const L = LV[k], x = GX(h), y = GY(L.v), d = dir[h];
+    if (d) {   // 風向きあり: 矢印（色=風の強さ、向き=風向き）
+      o += `<polygon points="${pts(0.5)}" transform="translate(${f(x)} ${f(y)}) rotate(${arrowDeg(d)})" fill="${L.c}" stroke="#888780" stroke-width="1.5" stroke-linejoin="round"/>` + tx(x, y - 20, L.l, "middle", 12, "fg", 1);
+    } else {   // 風向きなし: 従来どおり丸
+      o += `<circle cx="${f(x)}" cy="${f(y)}" r="9" fill="${L.c}" stroke="#888780"/>` + tx(x, y - 14, L.l, "middle", 12, "fg", 1);
+    }
   });
-  ["2", "3", "4", "5", "6", "b", "w"].forEach(k => {
+  ["2", "3", "4", "5", "6", "b", "w"].forEach(k => {   // 凡例（色=風の強さ）
     const L = LV[k], y = GY(L.v);
-    o += `<circle cx="357" cy="${f(y)}" r="5" fill="${L.c}" stroke="#888780"/>` + tx(366, y + 4, L.l, "start", 11, "mut");
+    o += `<polygon points="${pts(0.26)}" transform="translate(357 ${f(y)})" fill="${L.c}" stroke="#888780" stroke-width="1" stroke-linejoin="round"/>` + tx(366, y + 4, L.l, "start", 11, "mut");
   });
   $("chart").innerHTML = o + "</svg>";
 }
@@ -251,7 +291,8 @@ renderChart();
 // 保管用：日付・場所・コメント・時間別の風を、1つの文章にしてコピー
 function archiveText() {
   const m = getMeta();
-  const rows = HRS.map(h => wind[h] ? `${h}時 ${LV[wind[h]].l}（${LV[wind[h]].r}）` : `${h}時 -`);
+  const rows = HRS.map(h => `${h}時 ${wind[h] ? `${LV[wind[h]].l}（${LV[wind[h]].r}）` : "-"}${dir[h] ? ` 風向:${DIR[dir[h]].l}` : ""}`);
+  if (HRS.some(h => dir[h])) rows.push("※風向は、風が吹いてくる方向");
   return `日付: ${m.date}\n場所: ${m.sp || "（未入力）"}\n\n[コメント]\n${m.text || "（なし）"}\n\n[風とウイング（時間別）]\n${rows.join("\n")}`;
 }
 $("copyall").onclick = async () => {
@@ -268,6 +309,12 @@ $("copyall").onclick = async () => {
 };
 
 // 動画に焼き付けるグラフ（薄いグレーの半透明パネル）。論理サイズ1000x500で描いて拡大縮小する
+// 矢印の経路をCanvasに作る（中心x,y・向きdeg・倍率sc）。塗りと縁取りは呼び出し側で行う
+function arrowPath(g, x, y, deg, sc) {
+  g.save(); g.translate(x, y); g.rotate(deg * Math.PI / 180); g.scale(sc, sc);
+  g.beginPath(); ARROW.forEach(([px, py], i) => i ? g.lineTo(px, py) : g.moveTo(px, py)); g.closePath();
+  g.restore();
+}
 function graphCanvas(gw) {
   if (!HRS.some(h => wind[h])) return null;
   const k = gw / 1000, c = document.createElement("canvas");
@@ -285,7 +332,8 @@ function graphCanvas(gw) {
   g.beginPath(); g.moveTo(L, T - 10); g.lineTo(L, B); g.lineTo(R, B); g.stroke();
   g.fillStyle = "#333"; g.font = font(24); g.textBaseline = "alphabetic";
   g.textAlign = "right"; [0, 4, 6, 8, 11, 14, 18].forEach(v => g.fillText(v, L - 10, Y(v) + 8));
-  g.textAlign = "left"; g.fillText("風速 m/s", L, 34);
+  g.textAlign = "left"; g.fillText("風速 m/s", L, 30);
+  g.textAlign = "right"; g.font = font(22); g.fillText(ARROW_NOTE, 985, 30);
   g.textAlign = "center"; g.font = font(26);
   HRS.forEach(h => g.fillText(h, X(h), B + 38)); g.fillText("時", R + 6, B + 38);
   g.strokeStyle = "#666"; g.lineWidth = 3; g.lineJoin = "round";
@@ -298,40 +346,61 @@ function graphCanvas(gw) {
   });
   HRS.forEach(h => {
     const kk = wind[h]; if (!kk) return;
-    const l = LV[kk];
-    g.beginPath(); g.arc(X(h), Y(l.v), 22, 0, 7); g.fillStyle = l.c; g.fill();
-    g.strokeStyle = "#666"; g.lineWidth = 2; g.stroke();
-    g.fillStyle = "#111"; g.font = font(30, 700); g.textAlign = "center"; g.fillText(l.l, X(h), Y(l.v) - 30);
+    const l = LV[kk], d = dir[h], x = X(h), y = Y(l.v);
+    if (d) {   // 風向きあり: 太い矢印（色=風の強さ、向き=風向き）
+      arrowPath(g, x, y, arrowDeg(d), 1);
+      g.fillStyle = l.c; g.fill();
+      g.strokeStyle = "#444"; g.lineWidth = 3.5; g.lineJoin = "round"; g.stroke();
+    } else {   // 風向きなし: 従来どおり丸
+      g.beginPath(); g.arc(x, y, 22, 0, 7); g.fillStyle = l.c; g.fill();
+      g.strokeStyle = "#666"; g.lineWidth = 2; g.stroke();
+    }
+    g.fillStyle = "#111"; g.font = font(30, 700); g.textAlign = "center"; g.fillText(l.l, x, y - (d ? 38 : 30));
   });
-  ["2", "3", "4", "5", "6", "b", "w"].forEach(kk => {
+  ["2", "3", "4", "5", "6", "b", "w"].forEach(kk => {   // 凡例（色=風の強さ）
     const l = LV[kk];
-    g.beginPath(); g.arc(905, Y(l.v), 12, 0, 7); g.fillStyle = l.c; g.fill();
-    g.strokeStyle = "#666"; g.lineWidth = 2; g.stroke();
+    arrowPath(g, 905, Y(l.v), 0, 0.5);
+    g.fillStyle = l.c; g.fill();
+    g.strokeStyle = "#444"; g.lineWidth = 2; g.lineJoin = "round"; g.stroke();
     g.fillStyle = "#333"; g.font = font(26); g.textAlign = "left"; g.fillText(l.l, 926, Y(l.v) + 9);
   });
   return c;
 }
 
+// 音声の準備。iPhoneは「ボタンを押した直後」でないと音声機能を動かせないため、onclickの先頭で呼ぶ
+let ac, an;
+function prepAudio(v) {
+  try {
+    if (!ac) { const AC = window.AudioContext || window.webkitAudioContext; ac = new AC(); an = ac.createMediaElementSource(v); }
+    ac.resume();
+    const dst = ac.createMediaStreamDestination();   // 元の音声を、スピーカーには出さずに録音へだけ送る
+    an.disconnect(); an.connect(dst);
+    return dst;
+  } catch (e) { return null; }
+}
+
 $("ok").onclick = async () => {
   M = getMeta();
   if (!M.sp) return alert("場所を入力してください");
+  const dst = prepAudio($("src"));
   $("ok").disabled = true; $("result").hidden = true; $("work").hidden = false;
   $("state").textContent = "処理中… 0%";
-  try { await burn(); } catch (e) { alert("処理に失敗しました: " + e.message); $("ok").disabled = false; return; }
+  try { await burn(dst); } catch (e) { alert("処理に失敗しました: " + e.message); $("ok").disabled = false; $("work").hidden = true; return; }
   $("ok").disabled = false; $("work").hidden = true;
   showResult();
 };
 
-async function burn() {
+async function burn(dst) {
+  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream)
+    throw new Error("このブラウザは動画の書き出しに対応していません（iPhoneは新しいiOS（目安: 14.5以降）のSafariが必要です）");
   const v = $("src");
-  v.src = URL.createObjectURL(file);
-  await new Promise((r, j) => { v.onloadedmetadata = r; v.onerror = () => j(new Error("動画を読み込めません")); });
+  if (v.readyState < 1) await metaReady(v, 15000);
   const k = Math.min(1, 1080 / Math.min(v.videoWidth, v.videoHeight));   // 短辺1080pxまで縮小
   const W = Math.round(v.videoWidth * k / 2) * 2, H = Math.round(v.videoHeight * k / 2) * 2;
   const c = $("cv"); c.width = W; c.height = H;
   const ctx = c.getContext("2d");
 
-  // 既存 wind_ai.py と同じ仕様: 文字=幅の4.5% / 白 / 黒ボックス70% / 余白12 / 上から8% / 中央寄せ
+  // 文字=幅の4.5% / 濃いグレー / 薄いグレーの半透明ボックス / 余白12 / 上から8% / 中央寄せ
   const fs = Math.round(W * 0.045), pad = 12, side = 20, lh = fs * 1.25;
   ctx.font = `${fs}px ${FONT}`;
   const lines = wrap(ctx, M.text, W - 2 * (pad + side));
@@ -352,23 +421,21 @@ async function burn() {
   };
 
   const stream = c.captureStream(30);
-  try {   // 元の音声を無音のまま録音に取り込む
-    const ac = new AudioContext(), dst = ac.createMediaStreamDestination();
-    ac.createMediaElementSource(v).connect(dst);
-    dst.stream.getAudioTracks().forEach(t => stream.addTrack(t));
-    await ac.resume();
-  } catch (e) {}
+  if (dst) dst.stream.getAudioTracks().forEach(t => stream.addTrack(t));
   const mime = ["video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"]
     .find(t => MediaRecorder.isTypeSupported(t)) || "";
-  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8e6 });
+  const opt = { videoBitsPerSecond: 8e6 }; if (mime) opt.mimeType = mime;
+  const rec = new MediaRecorder(stream, opt);
   const chunks = [];
   rec.ondataavailable = e => e.data.size && chunks.push(e.data);
   const stopped = new Promise(r => rec.onstop = r);
-  let wl; try { wl = await navigator.wakeLock.request("screen"); } catch (e) {}
+  let wl; try { navigator.wakeLock.request("screen").then(l => wl = l).catch(() => {}); } catch (e) {}
 
   let run = true;
   v.onended = () => run = false;
-  rec.start(1000); v.currentTime = 0; await v.play();
+  rec.start(1000); v.currentTime = 0; v.muted = false;
+  // iPhoneで音あり再生が止められた場合は、音なしで再生し直す（映像とグラフは焼き付けられる）
+  try { await v.play(); } catch (e) { v.muted = true; await v.play(); }
   await new Promise(res => {
     (function loop() {
       if (!run) return res();
@@ -378,7 +445,7 @@ async function burn() {
     })();
   });
   drawFrame(); rec.stop(); await stopped;
-  if (wl) wl.release();
+  try { if (wl) wl.release(); } catch (e) {}
   blob = new Blob(chunks, { type: rec.mimeType || "video/webm" });
 }
 
@@ -386,7 +453,7 @@ function ext() { return blob.type.includes("mp4") ? "mp4" : "webm"; }
 
 function showResult() {
   const url = URL.createObjectURL(blob);
-  $("out").src = url; $("out").play();             // 焼き付け後の動画を再生
+  $("out").src = url; $("out").play().catch(() => {});             // 焼き付け後の動画を再生
   fillYT();
   $("save").href = url; $("save").download = `wind_${M.date.slice(0, 10).replace(/\//g, "")}.${ext()}`;
   $("result").hidden = false; $("result").scrollIntoView();
@@ -412,7 +479,7 @@ $("copyD").onclick = () => copyTo(fullDesc(), "説明欄をコピーしました
 $("share").onclick = async () => {
   const f = new File([blob], `wind.${ext()}`, { type: blob.type.split(";")[0] });
   if (!navigator.canShare || !navigator.canShare({ files: [f] })) return alert("この端末では共有できません。「動画を端末に保存」からYouTubeアプリで追加してください。");
-  try { await navigator.clipboard.writeText($("t").value); } catch (e) {}
+  try { navigator.clipboard.writeText($("t").value).catch(() => {}); } catch (e) {}   // awaitしない（iPhoneは共有の直前に待つと失敗する）
   $("msg").textContent = "タイトルをコピー済みです。YouTubeの画面で貼り付け、説明欄は「説明欄をコピー」を使ってください。";
   try { await navigator.share({ files: [f], title: $("t").value, text: fullDesc() }); } catch (e) {}
 };
